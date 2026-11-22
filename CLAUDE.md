@@ -49,4 +49,19 @@ Check claims against it rather than memory.
   its queued deliveries (`_cancel_pending`) — shared-phone privacy.
 - Only `tk.push.device.register/unregister` and `tk.push.notification.send`
   are public RPC surface; device writes go through sudo on behalf of `env.user` only.
+- Keep `res.users._tk_push_send()` single-underscore: Odoo 20's `safe_eval`
+  blocks only names containing `__`, so Automation Rules ("Execute Code") can
+  call it. Renaming it with `__` would break that documented use.
 - House style follows sibling repo `../tk-odoo-pubsub` (TerraKernel, LGPL-3, `tk.` models).
+
+## Scope decisions (settled with the user, don't reopen without asking)
+
+- **FCM is the only provider.** It already relays to APNs and covers web.
+  Direct APNs is out: Apple requires HTTP/2, which neither stdlib nor
+  `requests` speaks (see the no-deps rule). Huawei Push Kit is the next
+  provider *if* Huawei/no-Google-Play users appear; `provider_type` +
+  `_<type>_send_messages` is the extension point.
+- **No per-device targeting.** Audiences are users (incl. `group.all_user_ids`,
+  `partners.user_ids`) or FCM topics. Topics are how to reach specific devices
+  and app users who are not Odoo users: the app subscribes itself, Odoo never
+  learns who is subscribed. Device registration stays tied to an Odoo user.

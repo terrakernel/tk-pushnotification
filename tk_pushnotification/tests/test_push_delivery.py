@@ -2,7 +2,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from odoo import fields
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, ValidationError
 from odoo.tests import tagged
 
 from ..models.push_provider import TkPushProvider
@@ -132,13 +132,41 @@ class TestPushDelivery(PushCase):
         self.assertEqual(client.sent[0][0]['topic'], 'news')
         self.assertEqual(notification.sent_count, 1)
 
-    def test_dry_run_flag_is_forwarded(self):
+    def test_invalid_topic_is_rejected_on_save(self):
+        for topic, message in (('/topics/news', 'prefix'), ('news alerts', 'not a valid')):
+            with self.subTest(topic=topic), self.assertRaisesRegex(ValidationError, message), \
+                    self.env.cr.savepoint():
+                self.Notification.send(topic=topic, title="Hi")
+
+    def test_dry_run_is_validated_not_sent(self):
         self.provider.validate_only = True
         self.register(self.user, 'tok')
-        self.Notification.send(self.user, "Hi")
+        notification = self.Notification.send(self.user, "Hi")
         with self.fake_fcm() as client:
             self.Message._process_queue()
-        self.assertTrue(client.sent[0][1])
+        self.assertTrue(client.sent[0][1], "validate_only must reach FCM")
+        message = notification.message_ids
+        self.assertEqual(message.state, 'validated')
+        self.assertFalse(message.sent_date)
+        self.assertTrue(message.provider_message_id)
+        self.assertEqual(notification.state, 'done')
+        self.assertEqual(notification.sent_count, 0)
+        self.assertEqual(notification.validated_count, 1)
+
+    def test_oversized_payload_is_refused_at_send(self):
+        self.register(self.user, 'tok')
+        with self.assertRaisesRegex(ValidationError, 'at most 4096'), self.env.cr.savepoint():
+            self.Notification.send(self.user, "Hi", "x" * 5000)
+        with self.assertRaisesRegex(ValidationError, 'at most 4096'), self.env.cr.savepoint():
+            self.Notification.send(self.user, "Hi", data={'blob': 'é' * 2100})  # 2 bytes each
+        self.assertFalse(self.Message.search([]))
+        # Just under the limit still goes through.
+        notification = self.Notification.send(self.user, None, "x" * 4000)
+        self.assertEqual(len(notification.message_ids), 1)
+
+    def test_reserved_data_key_is_refused_at_send(self):
+        with self.assertRaisesRegex(ValidationError, 'reserved'), self.env.cr.savepoint():
+            self.Notification.send(self.user, "Hi", data={'from': 'me'})
 
     def test_config_error_retries(self):
         self.register(self.user, 'tok')

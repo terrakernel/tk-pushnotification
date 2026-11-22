@@ -19,6 +19,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import threading
 import time
 from collections.abc import Mapping
@@ -45,6 +46,13 @@ METADATA_TIMEOUT = 3
 # Refresh this long before the token actually expires, so that a token never
 # lapses between being handed out and reaching FCM.
 TOKEN_EXPIRY_MARGIN = 300
+
+# FCM rejects messages whose notification + data payload exceeds 4096 bytes
+# (APNs applies the same budget on iOS).
+MAX_PAYLOAD_BYTES = 4096
+
+# FCM topic names: https://firebase.google.com/docs/cloud-messaging/send/topic-messages
+TOPIC_PATTERN = re.compile(r'[a-zA-Z0-9\-_.~%]+')
 
 # FcmError.errorCode values meaning the token will never work again: the app
 # was uninstalled, the token expired, or it belongs to another Firebase project.
@@ -85,6 +93,34 @@ class SendResult:
 # ----------------------------------------------------------------------
 # Message building
 # ----------------------------------------------------------------------
+
+def is_valid_topic(topic: str | None) -> bool:
+    """Whether FCM accepts ``topic`` as a topic name (without the /topics/ prefix)."""
+    return bool(topic) and TOPIC_PATTERN.fullmatch(topic) is not None
+
+
+def payload_size(message: Mapping) -> int:
+    """Estimate, in bytes, what FCM counts against :data:`MAX_PAYLOAD_BYTES`.
+
+    FCM measures the notification and data keys and values on its side, by a
+    rule it does not publish. This measures the same parts serialised as
+    compact JSON, quotes and braces included, so it errs on the high side:
+    what passes here should pass FCM, at the cost of refusing a message a
+    few bytes under the real limit.
+    """
+    counted = {key: message[key] for key in ('notification', 'data') if message.get(key)}
+    return len(json.dumps(counted, separators=(',', ':'), ensure_ascii=False).encode()) if counted else 0
+
+
+def check_payload_size(message: Mapping) -> None:
+    """Raise ``ValueError`` if ``message`` is too large for FCM."""
+    size = payload_size(message)
+    if size > MAX_PAYLOAD_BYTES:
+        raise ValueError(
+            f"The notification and data payload is about {size} bytes; "
+            f"FCM accepts at most {MAX_PAYLOAD_BYTES}"
+        )
+
 
 def encode_data(data: Mapping | None) -> dict[str, str]:
     """FCM data payloads are a flat str -> str map. JSON-encode anything else."""
@@ -134,9 +170,14 @@ def build_message(
 
     ``ttl`` is in seconds: ``None`` keeps FCM's default (4 weeks), ``0`` means
     deliver now or drop.
+
+    Raises ``ValueError`` for anything FCM would refuse that can be known
+    without asking it: bad topic, reserved data key, oversized payload.
     """
     if bool(token) == bool(topic):
         raise ValueError("Exactly one of token or topic must be given")
+    if topic and not is_valid_topic(topic):
+        raise ValueError(f"Invalid FCM topic name {topic!r}: use only letters, digits and - _ . ~ %")
     if priority not in ('high', 'normal'):
         raise ValueError(f"Unknown priority {priority!r}")
     if ttl is not None and ttl < 0:
@@ -186,6 +227,7 @@ def build_message(
 
     if overrides:
         message = deep_merge(message, overrides)
+    check_payload_size(message)
     return message
 
 

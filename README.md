@@ -81,7 +81,7 @@ project.
 |---|---|
 | Code | Stable identifier apps send when registering, e.g. `customer_app`. Needed only when one database serves several apps; apps sending none are attached to the first provider. |
 | Authentication | *Service Account Key*: paste the JSON from Firebase console → Project settings → Service accounts → Generate new private key. The default `firebase-adminsdk-…` account already holds the needed permission (`cloudmessaging.messages.create`). *Application Default Credentials* stores no secret: it reads the service account key file named by `GOOGLE_APPLICATION_CREDENTIALS`, or else asks the GCP metadata server (GCE, GKE workload identity, Cloud Run) — preferred on GCP. User credentials from `gcloud auth application-default login` are not supported. |
-| Dry Run | FCM validates every message but delivers none. Turn this on in staging databases restored from production. |
+| Dry Run | FCM validates every message but delivers none. Turn this on in staging databases restored from production. Deliveries are then recorded as *Validated (Dry Run)*, never as *Sent*. |
 | Max Attempts / Request Timeout | Retry budget and per-request timeout. |
 
 **Test Connection** authenticates and sends a dry-run message to a token FCM
@@ -126,43 +126,112 @@ administrators can create or edit them directly.
 
 ## Sending
 
-From server code:
+The main use: **when a condition is met in Odoo, notify someone.** An order is
+confirmed, a ticket is escalated, a stock level drops: call the module
+directly from wherever that happens.
+
+The call never slows down or breaks the business operation, because it sends
+nothing itself. It only writes outbox rows in the current transaction:
+
+- the operation rolls back → nothing is sent;
+- it commits → the cron delivers within moments, retrying if FCM struggles.
+
+### Who can be reached
+
+| Audience | How | Notes |
+|---|---|---|
+| Specific users | `send(users, ...)` | Every active device each user registered: phone, tablet, browser. |
+| An Odoo group | `send(group.all_user_ids, ...)` | `all_user_ids` includes members through implied groups. Inactive users are skipped. |
+| Contacts | `send(partners.user_ids, ...)` | Only contacts that have a login. |
+| An FCM topic | `send(topic='promo', ...)` | Whoever subscribed, **Odoo user or not**: see below. |
+
+**Topics** are the way to reach app users who have no Odoo account, and to
+target devices rather than people: a kitchen tablet, a POS terminal, a
+warehouse scanner. The app subscribes the device itself with the Firebase SDK
+(`subscribeToTopic('kitchen-orders')`), never registers with Odoo, and needs no
+sign-in. Odoo then sends a single message and FCM fans it out. Keep in mind:
+
+- Odoo does not know who is subscribed, or how many; FCM only confirms it
+  accepted the message for the topic.
+- Topic names may contain only letters, digits and `- _ . ~ %`, without the
+  `/topics/` prefix. Invalid names are refused when the notification is saved.
+- Subscriptions are managed by the app; there is no server-side subscribe.
+
+### From your module's code
+
+Add `tk_pushnotification` to your module's `depends`, then:
 
 ```python
-self.env['tk.push.notification'].send(
-    order.user_id,                      # res.users recordset or ids
-    "Order confirmed",
-    f"{order.name} was confirmed",
-    data={'order_id': order.id},        # delivered to the app as string key/values
-    record=order,                       # linked for auditing
-    link_url=f"/my/orders/{order.id}",
-)
+def action_confirm(self):
+    res = super().action_confirm()
+    for order in self:
+        order.user_id._tk_push_send(
+            "Order confirmed",
+            f"{order.name} for {order.partner_id.name}",
+            data={'model': 'sale.order', 'id': order.id},  # read by the app
+            record=order,                                  # linked for auditing
+            link_url=f"/my/orders/{order.id}",
+        )
+    return res
 ```
 
-`send()` runs with the caller's rights, and only push administrators may
-create notifications. Business code notifying on behalf of an ordinary or
-portal user should use the helper, which elevates:
+`users._tk_push_send()` notifies those users whoever the caller is, portal
+users included. `env['tk.push.notification'].send()` is the same call but runs
+with the caller's rights, and only push administrators may create
+notifications: use it under `sudo()`, or where the caller is an administrator.
 
 ```python
-order.user_id._tk_push_send("Order confirmed", f"{order.name} was confirmed", record=order)
+self.env['tk.push.notification'].sudo().send(topic='ops-alerts', title="Stock low", body=product.name)
 ```
 
-Every keyword of `send()`:
+### From an Automation Rule, with no module
+
+**Settings → Technical → Automation Rules** (module `base_automation`): pick the model and trigger (e.g.
+*On update*, with a filter on the condition), action *Execute Code*:
+
+```python
+for rec in records:
+    rec.user_id._tk_push_send("Ticket escalated", rec.name, data={'id': rec.id})
+```
+
+### From another system
+
+Through JSON-2, with a push administrator's API key:
+
+```bash
+curl -X POST https://odoo.example.com/json/2/tk.push.notification/send \
+  -H "Authorization: bearer $ODOO_API_KEY" -H "Content-Type: application/json" \
+  -d '{"users": [7, 12], "title": "Report ready", "body": "Q3 sales", "data": {"report": "q3"}}'
+```
+
+### Options
+
+`send(users=None, title=None, body=None, **options)` and `_tk_push_send(title=None, body=None, **options)`
+take the same keywords:
 
 | Keyword | |
 |---|---|
-| `data` | `dict` → FCM `data`. Non-string values are JSON-encoded. |
+| `data` | `dict` → FCM `data`, read by the app. FCM only carries strings, so other values are JSON-encoded. |
 | `topic` | Send to an FCM topic instead of users (needs a provider; defaults to the first). |
 | `provider` | Record or code: restrict to one Firebase project's devices. |
+| `record` | The Odoo record this is about, linked on the notification for auditing. |
 | `image_url`, `link_url` | Rich image; tap target (`data.link`, and `webpush.fcm_options.link` when HTTPS). |
 | `priority` | `'high'` (default) or `'normal'`. |
 | `ttl` | Seconds the notification stays deliverable. `0`/omitted = FCM default (4 weeks). |
 | `collapse_key` | Newer notifications with the same key replace undelivered older ones. |
 | `scheduled_date` | Do not send before this UTC datetime. |
-| `overrides` | `dict` deep-merged into each FCM message last — the escape hatch, e.g. `{'android': {'notification': {'channel_id': 'orders'}}}`. |
+| `overrides` | `dict` deep-merged into each FCM message last: the escape hatch for anything else, e.g. `{'android': {'notification': {'channel_id': 'orders'}}, 'apns': {'payload': {'aps': {'badge': 3}}}}`. |
 
 Leave `title` and `body` empty to send a **data-only** (silent) message: it is
 sent to iOS as a background push (`content-available`, priority 5).
+
+FCM limits the notification and data payload to 4 KB. `send()` refuses a
+larger one straight away with a `ValidationError`, in the caller's transaction,
+rather than letting it fail later as an undelivered message. The size is
+estimated as the UTF-8 JSON of `notification` + `data` (overrides included),
+which slightly overcounts: a message within a few bytes of the limit may be
+refused although FCM would have taken it. Reserved data keys (`from`,
+`notification`, `message_type`, `google…`, `gcm…`) are refused the same way.
 
 Notifications are not translated per recipient: send one per language if you
 need to (`users.grouped('lang')`).
@@ -217,4 +286,6 @@ tests/test_fcm.py             standalone tests for tools/fcm.py
 - Bridge Discuss / chatter notifications to users' app devices.
 - *Send Push Notification* server action, for automation rules without code.
 - Concurrent sends for large audiences.
-- Direct APNs and Huawei Push Kit providers (`provider_type` is the extension point).
+- Huawei Push Kit, for Huawei phones without Google Play services (`provider_type` is the extension point).
+  Direct APNs is deliberately out: Apple requires HTTP/2, which neither the
+  standard library nor `requests` speaks, and FCM already relays to APNs.

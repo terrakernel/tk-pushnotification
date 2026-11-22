@@ -54,6 +54,7 @@ class TkPushMessage(models.Model):
         [
             ('queued', 'Queued'),
             ('sent', 'Sent'),
+            ('validated', 'Validated (Dry Run)'),
             ('failed', 'Failed'),
             ('invalid', 'Invalid Token'),
             ('cancelled', 'Cancelled'),
@@ -163,22 +164,16 @@ class TkPushMessage(models.Model):
 
     def _fcm_payload(self):
         self.ensure_one()
-        notification = self.notification_id
-        return fcm.build_message(
-            token=self.token or None,
-            topic=self.topic or None,
-            title=notification.title or None,
-            body=notification.body or None,
-            image=notification.image_url or None,
-            data=notification._load_json('data') if notification.data else None,
-            link=notification.link_url or None,
-            priority=notification.priority,
-            ttl=notification.ttl or None,
-            collapse_key=notification.collapse_key or None,
-            overrides=notification._load_json('overrides') if notification.overrides else None,
-        )
+        return self.notification_id._fcm_message(token=self.token or None, topic=self.topic or None)
 
-    def _apply_result(self, result: fcm.SendResult):
+    def _apply_result(self, result: fcm.SendResult, *, dry_run=False):
+        """Record the outcome of one attempt.
+
+        ``dry_run``: FCM validated the message without delivering it, and
+        answers with a message id all the same. Such deliveries are recorded
+        as *validated*, never as *sent*, so a staging database cannot pass
+        for one that notified people.
+        """
         self.ensure_one()
         now = fields.Datetime.now()
         attempts = self.attempt_count + 1
@@ -188,7 +183,9 @@ class TkPushMessage(models.Model):
             'error_code': result.error_code or False,
             'error_message': result.error_message or False,
         }
-        if result.ok:
+        if result.ok and dry_run:
+            vals.update(state='validated', provider_message_id=result.message_id)
+        elif result.ok:
             vals.update(state='sent', sent_date=now, provider_message_id=result.message_id)
         elif result.token_invalid:
             vals['state'] = 'invalid'

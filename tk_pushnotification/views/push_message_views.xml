@@ -7,6 +7,7 @@
         <field name="arch" type="xml">
             <list string="Deliveries" create="0" edit="0"
                   decoration-success="state == 'sent'"
+                  decoration-warning="state == 'validated'"
                   decoration-danger="state in ('failed', 'invalid')"
                   decoration-muted="state == 'cancelled'">
                 <field name="notification_id"/>
@@ -16,6 +17,7 @@
                 <field name="provider_id" optional="hide"/>
                 <field name="state" widget="badge"
                        decoration-success="state == 'sent'"
+                       decoration-warning="state == 'validated'"
                        decoration-info="state == 'queued'"
                        decoration-danger="state in ('failed', 'invalid')"/>
                 <field name="attempt_count" optional="show"/>
@@ -72,6 +74,7 @@
                 <field name="error_code"/>
                 <filter name="queued" string="Queued" domain="[('state', '=', 'queued')]"/>
                 <filter name="sent" string="Sent" domain="[('state', '=', 'sent')]"/>
+                <filter name="validated" string="Dry Run" domain="[('state', '=', 'validated')]"/>
                 <filter name="problems" string="Failed" domain="[('state', 'in', ('failed', 'invalid'))]"/>
                 <group>
                     <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>

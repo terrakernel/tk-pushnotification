@@ -7,6 +7,8 @@ from collections import defaultdict
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
+from ..tools import fcm
+
 _logger = logging.getLogger(__name__)
 
 
@@ -83,6 +85,11 @@ class TkPushNotification(models.Model):
     message_ids = fields.One2many('tk.push.message', 'notification_id', string='Deliveries')
     message_count = fields.Integer(compute='_compute_message_stats')
     sent_count = fields.Integer(compute='_compute_message_stats')
+    validated_count = fields.Integer(
+        compute='_compute_message_stats',
+        string='Validated (Dry Run)',
+        help="Accepted by FCM in dry-run mode: validated, not delivered.",
+    )
     failed_count = fields.Integer(compute='_compute_message_stats')
     pending_count = fields.Integer(compute='_compute_message_stats')
 
@@ -97,6 +104,7 @@ class TkPushNotification(models.Model):
             counts = stats[notification]
             notification.message_count = sum(counts.values())
             notification.sent_count = counts['sent']
+            notification.validated_count = counts['validated']
             notification.failed_count = counts['failed'] + counts['invalid']
             notification.pending_count = counts['queued']
 
@@ -110,13 +118,55 @@ class TkPushNotification(models.Model):
     @api.constrains('target', 'topic', 'provider_id')
     def _check_topic(self):
         for notification in self:
-            if notification.target == 'topic' and not (notification.topic and notification.provider_id):
+            if notification.target != 'topic':
+                continue
+            if not (notification.topic and notification.provider_id):
                 raise ValidationError(self.env._("A topic notification needs a topic and a provider."))
+            if not fcm.is_valid_topic(notification.topic):
+                hint = (
+                    self.env._(" Leave out the /topics/ prefix.")
+                    if notification.topic.startswith('/topics/') else ''
+                )
+                raise ValidationError(self.env._(
+                    "%(topic)r is not a valid FCM topic name: use only letters, digits and - _ . ~ %%.%(hint)s",
+                    topic=notification.topic, hint=hint,
+                ))
 
     @api.constrains('ttl')
     def _check_ttl(self):
         if any(notification.ttl < 0 for notification in self):
             raise ValidationError(self.env._("The time to live cannot be negative."))
+
+    @api.constrains('title', 'body', 'image_url', 'link_url', 'data', 'overrides',
+                    'priority', 'ttl', 'collapse_key')
+    def _check_fcm_message(self):
+        """Refuse, when saving, what FCM would refuse when sending: oversized
+        payloads and reserved data keys. Caught here, the error reaches the
+        developer who called send(); caught by FCM, it would only show up as a
+        failed delivery, after the fact."""
+        for notification in self:
+            try:
+                # Any token will do: only the content is being checked.
+                notification._fcm_message(token='payload-check')
+            except ValueError as err:
+                raise ValidationError(self.env._("This notification cannot be sent through FCM: %s", err)) from err
+
+    def _fcm_message(self, *, token=None, topic=None):
+        """The FCM message for this notification, addressed to ``token`` or ``topic``."""
+        self.ensure_one()
+        return fcm.build_message(
+            token=token,
+            topic=topic,
+            title=self.title or None,
+            body=self.body or None,
+            image=self.image_url or None,
+            data=self._load_json('data') if self.data else None,
+            link=self.link_url or None,
+            priority=self.priority,
+            ttl=self.ttl or None,
+            collapse_key=self.collapse_key or None,
+            overrides=self._load_json('overrides') if self.overrides else None,
+        )
 
     def _load_json(self, fname):
         self.ensure_one()

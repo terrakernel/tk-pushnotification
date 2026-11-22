@@ -234,7 +234,7 @@ class TkPushProvider(models.Model):
                 messages[index:]._apply_config_error(str(err))
                 self._drop_client()
                 return
-            message._apply_result(result)
+            message._apply_result(result, dry_run=self.validate_only)
 
     # ------------------------------------------------------------------
     # UI

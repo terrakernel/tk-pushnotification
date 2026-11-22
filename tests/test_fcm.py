@@ -82,6 +82,31 @@ class TestBuildMessage(unittest.TestCase):
         )
         self.assertEqual(message['android'], {'priority': 'NORMAL', 'notification': {'channel_id': 'orders'}})
 
+    def test_payload_size_counts_notification_and_data_in_utf8(self):
+        message = fcm.build_message(token='t' * 500, title='é', data={'k': 'v'})
+        # Only notification + data count: not the token, nor platform blocks.
+        self.assertEqual(fcm.payload_size(message), len('{"notification":{"title":"é"},"data":{"k":"v"}}'.encode()))
+        self.assertEqual(fcm.payload_size({'token': 't'}), 0)
+
+    def test_oversized_payload_is_refused(self):
+        fcm.build_message(token='t', body='x' * 4000)
+        with self.assertRaisesRegex(ValueError, 'at most 4096'):
+            fcm.build_message(token='t', body='x' * 4100)
+        with self.assertRaisesRegex(ValueError, 'at most 4096'):
+            fcm.build_message(token='t', data={'k': '€' * 1400})  # 3 bytes each in UTF-8
+        # Overrides count too: they are merged before the check.
+        with self.assertRaisesRegex(ValueError, 'at most 4096'):
+            fcm.build_message(token='t', title='x', overrides={'data': {'big': 'x' * 4100}})
+
+    def test_topic_names(self):
+        for topic in ('news', 'Promo_2026', 'a-b.c~d%20e', 'x' * 200):
+            with self.subTest(topic=topic):
+                self.assertTrue(fcm.is_valid_topic(topic))
+                self.assertEqual(fcm.build_message(topic=topic, title='x')['topic'], topic)
+        for topic in ('', None, '/topics/news', 'news alerts', 'a/b', 'café', 'news\n'):
+            with self.subTest(topic=topic):
+                self.assertFalse(fcm.is_valid_topic(topic))
+
     def test_invalid_input(self):
         for kwargs in (
             {},
@@ -90,6 +115,9 @@ class TestBuildMessage(unittest.TestCase):
             {'token': 't', 'ttl': -1},
             {'token': 't', 'data': {'from': 'x'}},
             {'token': 't', 'data': {'google.foo': 'x'}},
+            {'topic': '/topics/news'},
+            {'topic': 'news alerts'},
+            {'topic': 'nouvelles-é'},
         ):
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
                 fcm.build_message(**kwargs)
