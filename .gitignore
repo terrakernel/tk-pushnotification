@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.idea/
+.vscode/
+.DS_Store
+
+# Never commit Firebase / GCP service account keys
+*-service-account.json
+*credentials*.json
+*firebase-adminsdk*.json

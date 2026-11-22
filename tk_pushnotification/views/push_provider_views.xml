@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="tk_push_provider_view_list" model="ir.ui.view">
+        <field name="name">tk.push.provider.list</field>
+        <field name="model">tk.push.provider</field>
+        <field name="arch" type="xml">
+            <list string="Providers">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="provider_type"/>
+                <field name="fcm_project_id"/>
+                <field name="validate_only" widget="boolean_toggle" readonly="1"/>
+                <field name="device_count" string="Devices"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="tk_push_provider_view_form" model="ir.ui.view">
+        <field name="name">tk.push.provider.form</field>
+        <field name="model">tk.push.provider</field>
+        <field name="arch" type="xml">
+            <form string="Provider">
+                <header>
+                    <button name="action_test_connection" type="object" string="Test Connection" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <widget name="web_ribbon" title="Dry Run" bg_color="text-bg-warning" invisible="not active or not validate_only"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_devices" type="object" class="oe_stat_button" icon="fa-mobile">
+                            <field name="device_count" widget="statinfo" string="Devices"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Customer App"/></h1>
+                    </div>
+                    <field name="active" invisible="1"/>
+                    <group>
+                        <group string="Service">
+                            <field name="provider_type"/>
+                            <field name="code" placeholder="customer_app"/>
+                        </group>
+                        <group string="Delivery">
+                            <field name="validate_only"/>
+                            <field name="request_timeout"/>
+                            <field name="max_attempts"/>
+                        </group>
+                    </group>
+                    <group string="Firebase" invisible="provider_type != 'fcm'">
+                        <field name="fcm_auth_method" widget="radio"/>
+                        <field name="fcm_service_account_key" password="True"
+                               invisible="fcm_auth_method != 'service_account'"
+                               required="provider_type == 'fcm' and fcm_auth_method == 'service_account'"
+                               placeholder='{"type": "service_account", "project_id": "...", ...}'/>
+                        <field name="fcm_project_id" placeholder="my-app-12345"
+                               required="provider_type == 'fcm' and fcm_auth_method == 'adc'"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="tk_push_provider_action" model="ir.actions.act_window">
+        <field name="name">Providers</field>
+        <field name="res_model">tk.push.provider</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Connect a Firebase project</p>
+            <p>A provider holds the credentials of one Firebase project. Apps register their devices against it.</p>
+        </field>
+    </record>
+
+</odoo>

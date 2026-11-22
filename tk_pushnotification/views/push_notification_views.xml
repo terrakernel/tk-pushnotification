@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="tk_push_notification_view_list" model="ir.ui.view">
+        <field name="name">tk.push.notification.list</field>
+        <field name="model">tk.push.notification</field>
+        <field name="arch" type="xml">
+            <list string="Notifications" decoration-muted="state == 'cancelled'">
+                <field name="create_date" string="Created"/>
+                <field name="title"/>
+                <field name="target" optional="hide"/>
+                <field name="res_model" optional="hide"/>
+                <field name="sent_count" string="Sent"/>
+                <field name="failed_count" string="Failed"/>
+                <field name="pending_count" string="Pending" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'queued'"
+                       decoration-success="state == 'done'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="tk_push_notification_view_form" model="ir.ui.view">
+        <field name="name">tk.push.notification.form</field>
+        <field name="model">tk.push.notification</field>
+        <field name="arch" type="xml">
+            <form string="Notification">
+                <header>
+                    <button name="action_send" type="object" string="Send" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_cancel" type="object" string="Cancel" invisible="state not in ('draft', 'queued')"/>
+                    <button name="action_reset_draft" type="object" string="Reset to Draft"
+                            invisible="state != 'cancelled' or message_count"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,queued,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_record" type="object" class="oe_stat_button" icon="fa-link"
+                                string="Related Record" invisible="not res_model or not res_id"/>
+                    </div>
+                    <div class="oe_title">
+                        <label for="title"/>
+                        <h1><field name="title" placeholder="e.g. Your order has shipped" readonly="state != 'draft'"/></h1>
+                    </div>
+                    <group>
+                        <group string="Content">
+                            <field name="body" readonly="state != 'draft'"/>
+                            <field name="image_url" widget="url" readonly="state != 'draft'"/>
+                            <field name="link_url" widget="url" readonly="state != 'draft'"/>
+                        </group>
+                        <group string="Audience">
+                            <field name="target" widget="radio" readonly="state != 'draft'"/>
+                            <field name="user_ids" widget="many2many_tags"
+                                   invisible="target != 'users'" readonly="state != 'draft'"/>
+                            <field name="topic" invisible="target != 'topic'"
+                                   required="target == 'topic'" readonly="state != 'draft'"/>
+                            <field name="provider_id" required="target == 'topic'" readonly="state != 'draft'"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Deliveries" name="deliveries" invisible="state == 'draft'">
+                            <group>
+                                <group>
+                                    <field name="sent_count"/>
+                                    <field name="failed_count"/>
+                                    <field name="pending_count"/>
+                                </group>
+                                <group>
+                                    <field name="done_date" invisible="not done_date"/>
+                                </group>
+                            </group>
+                            <field name="message_ids" readonly="1"/>
+                        </page>
+                        <page string="Delivery Options" name="options">
+                            <group>
+                                <group>
+                                    <field name="priority" readonly="state != 'draft'"/>
+                                    <field name="ttl" readonly="state != 'draft'"/>
+                                    <field name="collapse_key" readonly="state != 'draft'"/>
+                                    <field name="scheduled_date" readonly="state != 'draft'"/>
+                                </group>
+                                <group>
+                                    <field name="res_model" readonly="1" invisible="not res_model"/>
+                                    <field name="res_id" readonly="1" invisible="not res_model"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Data" name="data">
+                            <label for="data"/>
+                            <field name="data" widget="code" options="{'mode': 'javascript'}"
+                                   placeholder='{"order_id": 42}' readonly="state != 'draft'"/>
+                            <label for="overrides"/>
+                            <field name="overrides" widget="code" options="{'mode': 'javascript'}"
+                                   readonly="state != 'draft'"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="tk_push_notification_view_search" model="ir.ui.view">
+        <field name="name">tk.push.notification.search</field>
+        <field name="model">tk.push.notification</field>
+        <field name="arch" type="xml">
+            <search string="Notifications">
+                <field name="title"/>
+                <field name="user_ids"/>
+                <field name="topic"/>
+                <field name="res_model"/>
+                <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="queued" string="Sending" domain="[('state', '=', 'queued')]"/>
+                <filter name="done" string="Processed" domain="[('state', '=', 'done')]"/>
+                <separator/>
+                <filter name="has_failures" string="With Failures"
+                        domain="[('message_ids.state', 'in', ('failed', 'invalid'))]"/>
+                <group>
+                    <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_by_model" string="Related Model" context="{'group_by': 'res_model'}"/>
+                    <filter name="group_by_day" string="Day" context="{'group_by': 'create_date:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="tk_push_notification_action" model="ir.actions.act_window">
+        <field name="name">Notifications</field>
+        <field name="res_model">tk.push.notification</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Send a push notification</p>
+            <p>Notifications are usually sent from code with <code>tk.push.notification.send()</code>; you can also compose one here to test a device.</p>
+        </field>
+    </record>
+
+</odoo>

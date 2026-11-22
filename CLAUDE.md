@@ -1,0 +1,52 @@
+# tk-pushnotification
+
+Odoo **20.0** addon `tk_pushnotification`: push notifications to customers'
+own apps via Firebase Cloud Messaging HTTP v1. README.md has the design and
+delivery semantics; read it before changing models/push_message.py.
+
+## Commands
+
+- FCM client tests (no Odoo): `python -m unittest discover -s tests`
+- Odoo tests: `odoo-bin -d test_push -i tk_pushnotification --test-tags /tk_pushnotification --stop-after-init`
+  (or the `docker compose run` form in README.md)
+
+## Odoo 20 API — verified against the 20.0 source, don't regress to 19 idioms
+
+Local sources (Community + Enterprise): `/Volumes/BCKUP/odoo_source/`.
+16.0–19.0 are unpacked; 20.0 is only `odoo_20.0+e.20260924.tar.gz` — extract it
+somewhere temporary (packaged layout: addons live under `odoo/addons/`).
+Check claims against it rather than memory.
+
+- Security is `security/ir.access.csv`, model `ir.access` (ACLs and record
+  rules merged; `ir.rule` is gone). Header:
+  `id,name,model_id,group_id/id,operation,domain` — `model_id` is the model
+  *name* (`tk.push.device`), `operation` a subset of `crud`, `domain` a domain
+  string with `user`, `company_ids`, `time` available. Grants are additive.
+- Groups: `res.groups.privilege` (with `category_id`) ← `res.groups.privilege_id`;
+  `implied_ids`, `implied_by_ids`, `user_ids`. Users: `group_ids`, `all_group_ids`.
+- `models.Constraint(...)` / `models.Index(...)` class attributes, not `_sql_constraints`.
+- Translations: `self.env._("... %s", x)` (kwargs for `%(name)s`).
+- Config params: `ir.config_parameter.get_str/get_int/get_bool/set_str/...`.
+- Routes: `type='jsonrpc'` (not `'json'`). Don't import `request` in model code.
+- Cron batching: `self.env['ir.cron']._commit_progress(n, remaining=...)`
+  returns seconds left; `cron._trigger(at)` is transactional.
+- Raw SQL: `self.env.execute_query(SQL(...))` after `flush_model(...)`.
+- Binary fields are `BinaryValue` objects (no base64) — relevant if one is added.
+- Python 3.12–3.14, PostgreSQL 16+.
+
+## Invariants
+
+- **No dependencies beyond Odoo's own.** Only the standard library plus what
+  Odoo 20 already requires (`requests`, `cryptography`, … — see Odoo's
+  `requirements.txt`). No google-auth, firebase-admin, PyJWT: Google OAuth2
+  (RS256 JWT bearer grant, metadata server) is hand-rolled in `tools/fcm.py`.
+  Nothing to `pip install`, no `external_dependencies` in the manifest.
+  Stick to APIs present in cryptography 42 (Odoo's pin), not just the latest.
+- `tools/fcm.py` imports nothing from Odoo; keep it unit-testable standalone.
+- Never call FCM inside the business transaction: write `tk.push.message`
+  rows and let the cron send (outbox, at-least-once).
+- When a device is removed, deactivated or reassigned to another user, cancel
+  its queued deliveries (`_cancel_pending`) — shared-phone privacy.
+- Only `tk.push.device.register/unregister` and `tk.push.notification.send`
+  are public RPC surface; device writes go through sudo on behalf of `env.user` only.
+- House style follows sibling repo `../tk-odoo-pubsub` (TerraKernel, LGPL-3, `tk.` models).

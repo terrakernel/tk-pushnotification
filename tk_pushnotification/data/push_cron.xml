@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Woken on demand by tk.push.notification._enqueue() and by scheduled
+         retries; the hourly interval is only a safety net. -->
+    <record id="ir_cron_push_send" model="ir.cron">
+        <field name="name">Push Notifications: deliver queued messages</field>
+        <field name="model_id" ref="model_tk_push_message"/>
+        <field name="state">code</field>
+        <field name="code">model._process_queue()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="priority">5</field>
+    </record>
+
+</odoo>

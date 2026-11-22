@@ -1,0 +1,7 @@
+id,name,model_id,group_id/id,operation,domain
+access_tk_push_provider_manager,tk.push.provider manager,tk.push.provider,group_push_manager,crud,
+access_tk_push_device_manager,tk.push.device manager,tk.push.device,group_push_manager,crud,
+access_tk_push_device_user_own,tk.push.device user: own devices,tk.push.device,base.group_user,rd,"[('user_id', '=', user.id)]"
+access_tk_push_device_portal_own,tk.push.device portal: own devices,tk.push.device,base.group_portal,rd,"[('user_id', '=', user.id)]"
+access_tk_push_notification_manager,tk.push.notification manager,tk.push.notification,group_push_manager,crud,
+access_tk_push_message_manager,tk.push.message manager,tk.push.message,group_push_manager,rud,

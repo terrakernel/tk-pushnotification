@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="tk_push_device_view_list" model="ir.ui.view">
+        <field name="name">tk.push.device.list</field>
+        <field name="model">tk.push.device</field>
+        <field name="arch" type="xml">
+            <list string="Devices" create="0" decoration-muted="not active">
+                <field name="user_id"/>
+                <field name="platform"/>
+                <field name="device_name"/>
+                <field name="app_id" optional="hide"/>
+                <field name="app_version" optional="show"/>
+                <field name="os_version" optional="hide"/>
+                <field name="provider_id" optional="show"/>
+                <field name="last_seen"/>
+                <field name="deactivation_reason" optional="hide"/>
+                <field name="active" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="tk_push_device_view_form" model="ir.ui.view">
+        <field name="name">tk.push.device.form</field>
+        <field name="model">tk.push.device</field>
+        <field name="arch" type="xml">
+            <form string="Device" create="0">
+                <sheet>
+                    <widget name="web_ribbon" title="Inactive" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="user_id" readonly="1"/>
+                            <field name="provider_id" readonly="1"/>
+                            <field name="platform" readonly="1"/>
+                            <field name="last_seen" readonly="1"/>
+                            <field name="deactivation_reason" invisible="active"/>
+                        </group>
+                        <group>
+                            <field name="device_name"/>
+                            <field name="app_id"/>
+                            <field name="app_version"/>
+                            <field name="os_version"/>
+                        </group>
+                    </group>
+                    <group string="Token">
+                        <field name="token" nolabel="1" colspan="2" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="tk_push_device_view_search" model="ir.ui.view">
+        <field name="name">tk.push.device.search</field>
+        <field name="model">tk.push.device</field>
+        <field name="arch" type="xml">
+            <search string="Devices">
+                <field name="user_id"/>
+                <field name="device_name"/>
+                <field name="app_id"/>
+                <filter name="android" string="Android" domain="[('platform', '=', 'android')]"/>
+                <filter name="ios" string="iOS" domain="[('platform', '=', 'ios')]"/>
+                <filter name="web" string="Web" domain="[('platform', '=', 'web')]"/>
+                <separator/>
+                <filter name="inactive" string="Inactive" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_by_user" string="User" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_by_platform" string="Platform" context="{'group_by': 'platform'}"/>
+                    <filter name="group_by_provider" string="Provider" context="{'group_by': 'provider_id'}"/>
+                    <filter name="group_by_app_version" string="App Version" context="{'group_by': 'app_version'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="tk_push_device_action" model="ir.actions.act_window">
+        <field name="name">Devices</field>
+        <field name="res_model">tk.push.device</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_empty_folder">No device registered yet</p>
+            <p>Devices appear here when a signed-in app registers its push token.</p>
+        </field>
+    </record>
+
+</odoo>

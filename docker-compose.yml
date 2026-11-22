@@ -1,0 +1,29 @@
+# Local development only. http://localhost:8069
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+      POSTGRES_DB: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  odoo:
+    image: odoo:20.0
+    depends_on:
+      - db
+    ports:
+      - "8069:8069"
+    environment:
+      HOST: db
+      USER: odoo
+      PASSWORD: odoo
+    command: ["odoo", "--addons-path=/mnt/extra-addons", "--dev=xml,reload"]
+    volumes:
+      - ./:/mnt/extra-addons
+      - odoo-data:/var/lib/odoo
+
+volumes:
+  db-data:
+  odoo-data:

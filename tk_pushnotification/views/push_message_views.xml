@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="tk_push_message_view_list" model="ir.ui.view">
+        <field name="name">tk.push.message.list</field>
+        <field name="model">tk.push.message</field>
+        <field name="arch" type="xml">
+            <list string="Deliveries" create="0" edit="0"
+                  decoration-success="state == 'sent'"
+                  decoration-danger="state in ('failed', 'invalid')"
+                  decoration-muted="state == 'cancelled'">
+                <field name="notification_id"/>
+                <field name="user_id"/>
+                <field name="device_id" optional="show"/>
+                <field name="topic" optional="hide"/>
+                <field name="provider_id" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'sent'"
+                       decoration-info="state == 'queued'"
+                       decoration-danger="state in ('failed', 'invalid')"/>
+                <field name="attempt_count" optional="show"/>
+                <field name="next_attempt" optional="hide"/>
+                <field name="sent_date" optional="show"/>
+                <field name="error_code" optional="show"/>
+                <button name="action_retry" type="object" string="Retry" icon="fa-repeat" invisible="state != 'failed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="tk_push_message_view_form" model="ir.ui.view">
+        <field name="name">tk.push.message.form</field>
+        <field name="model">tk.push.message</field>
+        <field name="arch" type="xml">
+            <form string="Delivery" create="0" edit="0">
+                <header>
+                    <button name="action_retry" type="object" string="Retry" invisible="state != 'failed'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="queued,sent"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="notification_id"/>
+                            <field name="provider_id"/>
+                            <field name="user_id"/>
+                            <field name="device_id"/>
+                            <field name="topic" invisible="not topic"/>
+                        </group>
+                        <group>
+                            <field name="attempt_count"/>
+                            <field name="last_attempt"/>
+                            <field name="next_attempt" invisible="state != 'queued'"/>
+                            <field name="sent_date" invisible="not sent_date"/>
+                            <field name="provider_message_id" invisible="not provider_message_id"/>
+                        </group>
+                    </group>
+                    <group string="Error" invisible="not error_code">
+                        <field name="error_code"/>
+                        <field name="error_message"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="tk_push_message_view_search" model="ir.ui.view">
+        <field name="name">tk.push.message.search</field>
+        <field name="model">tk.push.message</field>
+        <field name="arch" type="xml">
+            <search string="Deliveries">
+                <field name="notification_id"/>
+                <field name="device_id"/>
+                <field name="error_code"/>
+                <filter name="queued" string="Queued" domain="[('state', '=', 'queued')]"/>
+                <filter name="sent" string="Sent" domain="[('state', '=', 'sent')]"/>
+                <filter name="problems" string="Failed" domain="[('state', 'in', ('failed', 'invalid'))]"/>
+                <group>
+                    <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_by_error" string="Error" context="{'group_by': 'error_code'}"/>
+                    <filter name="group_by_provider" string="Provider" context="{'group_by': 'provider_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="tk_push_message_action" model="ir.actions.act_window">
+        <field name="name">Deliveries</field>
+        <field name="res_model">tk.push.message</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_problems': 1}</field>
+    </record>
+
+</odoo>
