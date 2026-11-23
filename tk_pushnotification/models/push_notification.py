@@ -49,10 +49,23 @@ class TkPushNotification(models.Model):
         required=True,
     )
     user_ids = fields.Many2many('res.users', string='Recipients')
-    topic = fields.Char(help="FCM topic name, without the /topics/ prefix.")
+    topic_id = fields.Many2one(
+        'tk.push.topic',
+        string='Topic',
+        index='btree_not_null',
+        ondelete='set null',
+        help="A topic from the topic list. Sets the provider.",
+    )
+    topic = fields.Char(
+        string='Topic Name',
+        compute='_compute_topic', store=True, readonly=False,
+        help="The FCM topic name sent to, without the /topics/ prefix: the "
+             "chosen topic's name. Kept when the topic is deleted.",
+    )
     provider_id = fields.Many2one(
         'tk.push.provider',
         string='Provider',
+        compute='_compute_provider_id', store=True, readonly=False,
         help="Restrict delivery to this provider's devices. Required for topics.",
     )
 
@@ -93,6 +106,18 @@ class TkPushNotification(models.Model):
     failed_count = fields.Integer(compute='_compute_message_stats')
     pending_count = fields.Integer(compute='_compute_message_stats')
 
+    # Only assigned when a topic is chosen: a topic name or provider given
+    # without one (send() by name, history of a deleted topic) is kept.
+    @api.depends('topic_id')
+    def _compute_topic(self):
+        for notification in self.filtered('topic_id'):
+            notification.topic = notification.topic_id.name
+
+    @api.depends('topic_id')
+    def _compute_provider_id(self):
+        for notification in self.filtered('topic_id'):
+            notification.provider_id = notification.topic_id.provider_id
+
     @api.depends('message_ids.state')
     def _compute_message_stats(self):
         stats = defaultdict(lambda: defaultdict(int))
@@ -114,23 +139,6 @@ class TkPushNotification(models.Model):
             for fname in ('data', 'overrides'):
                 if notification[fname]:
                     notification._load_json(fname)
-
-    @api.constrains('target', 'topic', 'provider_id')
-    def _check_topic(self):
-        for notification in self:
-            if notification.target != 'topic':
-                continue
-            if not (notification.topic and notification.provider_id):
-                raise ValidationError(self.env._("A topic notification needs a topic and a provider."))
-            if not fcm.is_valid_topic(notification.topic):
-                hint = (
-                    self.env._(" Leave out the /topics/ prefix.")
-                    if notification.topic.startswith('/topics/') else ''
-                )
-                raise ValidationError(self.env._(
-                    "%(topic)r is not a valid FCM topic name: use only letters, digits and - _ . ~ %%.%(hint)s",
-                    topic=notification.topic, hint=hint,
-                ))
 
     @api.constrains('ttl')
     def _check_ttl(self):
@@ -197,6 +205,11 @@ class TkPushNotification(models.Model):
                 data={'order_id': order.id}, record=order,
             )
 
+        ``topic`` is a tk.push.topic or a topic name from the topic list. A
+        name that is invalid, missing from the list or archived does not
+        raise: the notification is recorded with a failed delivery saying why,
+        so a mistake here never undoes the caller's business operation.
+
         Runs with the caller's access rights: only push administrators may
         create notifications. Business code notifying on behalf of an ordinary
         user should go through ``res.users._tk_push_send()`` or call this with
@@ -204,8 +217,17 @@ class TkPushNotification(models.Model):
         """
         if isinstance(provider, str):
             provider = self.env['tk.push.provider']._get_for_code(provider)
-        if topic and not provider:
-            provider = self.env['tk.push.provider']._get_default()
+        topic_record = self.env['tk.push.topic']
+        if isinstance(topic, models.BaseModel):
+            topic_record, topic = topic, topic.name
+            provider = topic_record.provider_id
+        elif topic:
+            if not provider:
+                # The provider whose list has this topic, if only one has.
+                listed = topic_record.sudo().search([('name', '=', topic)], limit=2)
+                provider = listed.provider_id if len(listed) == 1 else None
+                provider = provider or self.env['tk.push.provider']._get_default()
+            topic_record = topic_record._find(provider, topic)  # archived ones too: linked, then refused
         if not isinstance(users, models.BaseModel):
             users = self.env['res.users'].browse(users or [])
         vals = {
@@ -216,6 +238,7 @@ class TkPushNotification(models.Model):
             'data': json.dumps(data, default=str) if isinstance(data, dict) else data,
             'overrides': json.dumps(overrides) if isinstance(overrides, dict) else overrides,
             'target': 'topic' if topic else 'users',
+            'topic_id': topic_record.id or False,
             'topic': topic,
             'user_ids': [fields.Command.set(users.ids)],
             'provider_id': provider.id if provider else False,
@@ -236,6 +259,8 @@ class TkPushNotification(models.Model):
                 raise UserError(self.env._("Only draft notifications can be sent."))
             if notification.target == 'users' and not notification.user_ids:
                 raise UserError(self.env._("Add at least one recipient."))
+            if notification.target == 'topic' and not notification.topic_id:
+                raise UserError(self.env._("Choose a topic."))
             if not (notification.title or notification.body or notification.data):
                 raise UserError(self.env._("A notification needs a title, a body or data."))
         self._enqueue()
@@ -265,16 +290,30 @@ class TkPushNotification(models.Model):
     def _enqueue(self):
         """Write one outbox message per target device and wake the sender."""
         Message = self.env['tk.push.message'].sudo()
+        Topic = self.env['tk.push.topic']
         vals_list = []
         for notification in self:
             next_attempt = notification.scheduled_date or fields.Datetime.now()
             if notification.target == 'topic':
-                vals_list.append({
+                if not notification.provider_id:
+                    _logger.warning(
+                        "tk_pushnotification: topic notification %s not sent: no push provider found",
+                        notification.id,
+                    )
+                    continue
+                vals = {
                     'notification_id': notification.id,
                     'provider_id': notification.provider_id.id,
                     'topic': notification.topic,
                     'next_attempt': next_attempt,
-                })
+                }
+                # Recorded, not raised: see send().
+                problem = Topic._send_problem(notification.provider_id, notification.topic)
+                if problem:
+                    code, error = problem
+                    _logger.warning("tk_pushnotification: notification %s not sent: %s", notification.id, error)
+                    vals.update(state='failed', error_code=code, error_message=error)
+                vals_list.append(vals)
                 continue
             domain = [('user_id', 'in', notification.user_ids.ids), ('user_id.active', '=', True)]
             if notification.provider_id:
@@ -294,8 +333,9 @@ class TkPushNotification(models.Model):
         self.write({'state': 'queued'})
         # Nothing to deliver: close right away instead of waiting for the cron.
         self._update_state()
-        if vals_list:
-            Message._schedule_processing(min(vals['next_attempt'] for vals in vals_list))
+        due = [vals['next_attempt'] for vals in vals_list if vals.get('state', 'queued') == 'queued']
+        if due:
+            Message._schedule_processing(min(due))
 
     def _update_state(self):
         """Close queued notifications with no delivery left pending."""

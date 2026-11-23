@@ -144,6 +144,8 @@ class TkPushMessage(models.Model):
         # The device may have signed out since the message was queued.
         orphaned = messages.filtered(lambda m: m.device_id and not m.device_id.active)
         orphaned.write({'state': 'cancelled', 'error_code': 'DEVICE_INACTIVE'})
+        # The topic may have been archived or removed from the list since.
+        orphaned |= messages.filtered('topic')._cancel_unlisted_topics()
         started = fields.Datetime.now()
         for provider, batch in (messages - orphaned).grouped('provider_id').items():
             try:
@@ -157,6 +159,22 @@ class TkPushMessage(models.Model):
                 )
                 unreached._apply_config_error(str(err))
         messages.notification_id._update_state()
+
+    def _cancel_unlisted_topics(self):
+        """Cancel the topic messages that can no longer be sent; return them."""
+        Topic = self.env['tk.push.topic']
+        problems = {}
+        cancelled = self.browse()
+        for message in self:
+            key = (message.provider_id, message.topic)
+            if key not in problems:
+                problems[key] = Topic._send_problem(*key)
+            if problems[key]:
+                code, error = problems[key]
+                _logger.warning("tk_pushnotification: message %s cancelled: %s", message.id, error)
+                message.write({'state': 'cancelled', 'error_code': code, 'error_message': error})
+                cancelled |= message
+        return cancelled
 
     # ------------------------------------------------------------------
     # Results

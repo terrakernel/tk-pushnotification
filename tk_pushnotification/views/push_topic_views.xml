@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="tk_push_topic_view_list" model="ir.ui.view">
+        <field name="name">tk.push.topic.list</field>
+        <field name="model">tk.push.topic</field>
+        <field name="arch" type="xml">
+            <list string="Topics" decoration-muted="not active">
+                <field name="name"/>
+                <field name="label"/>
+                <field name="provider_id"/>
+                <field name="app_offered" widget="boolean_toggle"/>
+                <field name="notification_count" string="Notifications" optional="show"/>
+                <field name="active" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="tk_push_topic_view_form" model="ir.ui.view">
+        <field name="name">tk.push.topic.form</field>
+        <field name="model">tk.push.topic</field>
+        <field name="arch" type="xml">
+            <form string="Topic">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_notifications" type="object" class="oe_stat_button" icon="fa-bell">
+                            <field name="notification_count" widget="statinfo" string="Notifications"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. promotions" readonly="notification_count"/></h1>
+                    </div>
+                    <field name="active" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="label" placeholder="e.g. Promotions and offers"/>
+                            <field name="provider_id" readonly="notification_count"/>
+                        </group>
+                        <group>
+                            <field name="app_offered"/>
+                        </group>
+                    </group>
+                    <field name="description" placeholder="What subscribers receive, shown to app users if the app wants it."/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="tk_push_topic_view_search" model="ir.ui.view">
+        <field name="name">tk.push.topic.search</field>
+        <field name="model">tk.push.topic</field>
+        <field name="arch" type="xml">
+            <search string="Topics">
+                <field name="name" filter_domain="['|', ('name', 'ilike', self), ('label', 'ilike', self)]"/>
+                <field name="provider_id"/>
+                <filter name="offered" string="Offered in Apps" domain="[('app_offered', '=', True)]"/>
+                <separator/>
+                <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_by_provider" string="Provider" context="{'group_by': 'provider_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="tk_push_topic_action" model="ir.actions.act_window">
+        <field name="name">Topics</field>
+        <field name="res_model">tk.push.topic</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">List the FCM topics you send to</p>
+            <p>Notifications can only be sent to topics listed here: a mistyped topic would otherwise reach nobody without any error from FCM. Who subscribes to a topic is managed by the apps, not here.</p>
+        </field>
+    </record>
+
+</odoo>

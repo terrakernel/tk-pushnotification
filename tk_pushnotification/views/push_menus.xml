@@ -11,6 +11,8 @@
               action="tk_push_notification_action" sequence="10"/>
     <menuitem id="menu_push_message" name="Deliveries" parent="menu_push_root"
               action="tk_push_message_action" sequence="20"/>
+    <menuitem id="menu_push_topic" name="Topics" parent="menu_push_root"
+              action="tk_push_topic_action" sequence="25"/>
     <menuitem id="menu_push_device" name="Devices" parent="menu_push_root"
               action="tk_push_device_action" sequence="30"/>
     <menuitem id="menu_push_provider" name="Providers" parent="menu_push_root"

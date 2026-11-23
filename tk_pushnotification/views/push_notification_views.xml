@@ -52,9 +52,13 @@
                             <field name="target" widget="radio" readonly="state != 'draft'"/>
                             <field name="user_ids" widget="many2many_tags"
                                    invisible="target != 'users'" readonly="state != 'draft'"/>
-                            <field name="topic" invisible="target != 'topic'"
-                                   required="target == 'topic'" readonly="state != 'draft'"/>
-                            <field name="provider_id" required="target == 'topic'" readonly="state != 'draft'"/>
+                            <field name="topic_id" invisible="target != 'topic'"
+                                   required="target == 'topic' and state == 'draft'" readonly="state != 'draft'"
+                                   domain="[('provider_id', '=?', provider_id)]"
+                                   options="{'no_create': True}"/>
+                            <field name="topic" invisible="target != 'topic' or topic_id" readonly="1"/>
+                            <field name="provider_id" required="target == 'topic'"
+                                   readonly="state != 'draft' or (target == 'topic' and topic_id)" force_save="1"/>
                         </group>
                     </group>
                     <notebook>
@@ -107,6 +111,7 @@
             <search string="Notifications">
                 <field name="title"/>
                 <field name="user_ids"/>
+                <field name="topic_id"/>
                 <field name="topic"/>
                 <field name="res_model"/>
                 <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
@@ -117,6 +122,7 @@
                         domain="[('message_ids.state', 'in', ('failed', 'invalid'))]"/>
                 <group>
                     <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_by_topic" string="Topic" context="{'group_by': 'topic_id'}"/>
                     <filter name="group_by_model" string="Related Model" context="{'group_by': 'res_model'}"/>
                     <filter name="group_by_day" string="Day" context="{'group_by': 'create_date:day'}"/>
                 </group>

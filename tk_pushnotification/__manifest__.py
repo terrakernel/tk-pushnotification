@@ -10,7 +10,7 @@ notifies users with one call; every notification is expanded into one message
 per device and written to an outbox in the same transaction, then delivered by
 a cron with retries, backoff and automatic clean-up of dead tokens.
 """,
-    'version': '20.0.1.0.0',
+    'version': '20.0.1.1.0',
     'category': 'Technical',
     'author': 'TerraKernel',
     'website': 'https://github.com/terrakernel/tk-pushnotification',
@@ -22,6 +22,7 @@ a cron with retries, backoff and automatic clean-up of dead tokens.
         'data/push_cron.xml',
         'views/push_provider_views.xml',
         'views/push_device_views.xml',
+        'views/push_topic_views.xml',
         'views/push_message_views.xml',
         'views/push_notification_views.xml',
         'views/push_menus.xml',

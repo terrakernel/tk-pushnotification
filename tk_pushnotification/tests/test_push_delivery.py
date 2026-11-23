@@ -125,18 +125,14 @@ class TestPushDelivery(PushCase):
         self.assertEqual(notification.state, 'queued')
 
     def test_topic(self):
+        news = self.env['tk.push.topic'].create({'name': 'news', 'provider_id': self.provider.id})
         notification = self.Notification.send(topic='news', title="Breaking")
         self.assertEqual(notification.provider_id, self.provider)
+        self.assertEqual(notification.topic_id, news)
         with self.fake_fcm() as client:
             self.Message._process_queue()
         self.assertEqual(client.sent[0][0]['topic'], 'news')
         self.assertEqual(notification.sent_count, 1)
-
-    def test_invalid_topic_is_rejected_on_save(self):
-        for topic, message in (('/topics/news', 'prefix'), ('news alerts', 'not a valid')):
-            with self.subTest(topic=topic), self.assertRaisesRegex(ValidationError, message), \
-                    self.env.cr.savepoint():
-                self.Notification.send(topic=topic, title="Hi")
 
     def test_dry_run_is_validated_not_sent(self):
         self.provider.validate_only = True
