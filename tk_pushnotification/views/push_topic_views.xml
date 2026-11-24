@@ -21,7 +21,9 @@
         <field name="model">tk.push.topic</field>
         <field name="arch" type="xml">
             <form string="Topic">
-                <sheet>
+                <!-- Users and portal users may read offered topics through the API, but only
+                     push administrators use this form; it relies on manager-only fields. -->
+                <sheet groups="tk_pushnotification.group_push_manager">
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                     <div class="oe_button_box" name="button_box">
                         <button name="action_view_notifications" type="object" class="oe_stat_button" icon="fa-bell">

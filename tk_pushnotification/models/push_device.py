@@ -66,7 +66,7 @@ class TkPushDevice(models.Model):
         that is what happens when someone signs out and a colleague signs in
         on the same phone.
         """
-        device = self._register(
+        device = self._register_device(
             token, platform, provider_code=provider_code, device_name=device_name,
             app_id=app_id, app_version=app_version, os_version=os_version,
         )
@@ -85,7 +85,7 @@ class TkPushDevice(models.Model):
         return {'removed': len(devices)}
 
     @api.private
-    def _register(self, token, platform, provider_code=None, **details):
+    def _register_device(self, token, platform, provider_code=None, **details):
         user = self.env.user
         if user._is_public():
             raise AccessError(self.env._("Sign in before registering a device for push notifications."))

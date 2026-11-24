@@ -32,6 +32,11 @@ Check claims against it rather than memory.
   returns seconds left; `cron._trigger(at)` is transactional.
 - Raw SQL: `self.env.execute_query(SQL(...))` after `flush_model(...)`.
 - Binary fields are `BinaryValue` objects (no base64) — relevant if one is added.
+- Don't name methods after ORM class attributes: `_register` is a bool on every
+  model (registry visibility) and silently replaced our `_register` method.
+- View access check (`Access Rights Inconsistency` at install): an element
+  shown to users who can read the model may not depend on a `groups=` field
+  (e.g. `readonly="notification_count"`); put `groups=` on the element/sheet.
 - Python 3.12–3.14, PostgreSQL 16+.
 
 ## Invariants
@@ -41,7 +46,8 @@ Check claims against it rather than memory.
   `requirements.txt`). No google-auth, firebase-admin, PyJWT: Google OAuth2
   (RS256 JWT bearer grant, metadata server) is hand-rolled in `tools/fcm.py`.
   Nothing to `pip install`, no `external_dependencies` in the manifest.
-  Stick to APIs present in cryptography 42 (Odoo's pin), not just the latest.
+  Stick to APIs present in cryptography 41 (the `odoo:20.0` image ships 41.0.7;
+  Odoo's requirements.txt pins 42), not just the latest.
 - `tools/fcm.py` imports nothing from Odoo; keep it unit-testable standalone.
 - Never call FCM inside the business transaction: write `tk.push.message`
   rows and let the cron send (outbox, at-least-once).
