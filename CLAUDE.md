@@ -37,6 +37,10 @@ Check claims against it rather than memory.
 - View access check (`Access Rights Inconsistency` at install): an element
   shown to users who can read the model may not depend on a `groups=` field
   (e.g. `readonly="notification_count"`); put `groups=` on the element/sheet.
+- Button/stat icons are Material Symbols ligature names (`icon="smartphone"`,
+  `"notifications"`, `"link"`, `"repeat"`), not `fa-*`: a `fa-` name renders a
+  stray "-". Only names in Odoo's subset exist:
+  `web/tooling/icons/icons_wishlist.txt`.
 - Python 3.12–3.14, PostgreSQL 16+.
 
 ## Invariants
@@ -82,6 +86,10 @@ Rules from the store's vendor guidelines and FAQ (read 2026-11-24):
   manifest paragraph true when payloads or endpoints change.
 - `icon.png` (real PNG) and `banner.png` (`images` key) are rendered from
   `store/*.html` by `store/render.sh`; edit the sources, not the PNGs.
+- Screenshots (`main_screenshot.png` is the large one, `screenshot_*.png`
+  in the page) come from a demo database: `store/screenshots/populate.py`
+  (via `odoo shell`, FCM never called) and `store/screenshots/capture.py`
+  (headless Chrome over `--remote-debugging-pipe`); usage in their headers.
 
 ## Scope decisions (settled with the user, don't reopen without asking)
 

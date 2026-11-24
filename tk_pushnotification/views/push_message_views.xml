@@ -24,7 +24,7 @@
                 <field name="next_attempt" optional="hide"/>
                 <field name="sent_date" optional="show"/>
                 <field name="error_code" optional="show"/>
-                <button name="action_retry" type="object" string="Retry" icon="fa-repeat" invisible="state != 'failed'"/>
+                <button name="action_retry" type="object" string="Retry" icon="repeat" invisible="state != 'failed'"/>
             </list>
         </field>
     </record>

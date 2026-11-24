@@ -22,7 +22,7 @@ signed-in user. No usage statistics are collected.
     'author': 'TerraKernel',
     'website': 'https://github.com/terrakernel/tk-pushnotification',
     'license': 'LGPL-3',
-    'images': ['static/description/banner.png'],
+    'images': ['static/description/banner.png', 'static/description/main_screenshot.png'],
     'depends': ['base', 'web'],
     'data': [
         'security/push_groups.xml',

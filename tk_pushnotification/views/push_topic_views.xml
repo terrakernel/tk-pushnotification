@@ -26,7 +26,7 @@
                 <sheet groups="tk_pushnotification.group_push_manager">
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                     <div class="oe_button_box" name="button_box">
-                        <button name="action_view_notifications" type="object" class="oe_stat_button" icon="fa-bell">
+                        <button name="action_view_notifications" type="object" class="oe_stat_button" icon="notifications">
                             <field name="notification_count" widget="statinfo" string="Notifications"/>
                         </button>
                     </div>

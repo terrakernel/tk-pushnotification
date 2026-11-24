@@ -29,7 +29,7 @@
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                     <widget name="web_ribbon" title="Dry Run" bg_color="text-bg-warning" invisible="not active or not validate_only"/>
                     <div class="oe_button_box" name="button_box">
-                        <button name="action_view_devices" type="object" class="oe_stat_button" icon="fa-mobile">
+                        <button name="action_view_devices" type="object" class="oe_stat_button" icon="smartphone">
                             <field name="device_count" widget="statinfo" string="Devices"/>
                         </button>
                     </div>
