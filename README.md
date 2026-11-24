@@ -469,8 +469,10 @@ tk_pushnotification/
 │   ├── push_message.py       the outbox and its cron
 │   └── res_users.py          _tk_push_send() helper
 ├── controllers/main.py       session routes for register/unregister
+├── static/description/       Odoo Apps Store page: index.html, icon.png, banner.png
 └── tests/                    Odoo TransactionCase tests (FCM mocked)
 tests/test_fcm.py             standalone tests for tools/fcm.py
+store/                        HTML sources of icon.png and banner.png; re-render with store/render.sh (needs Chrome)
 ```
 
 ## Roadmap

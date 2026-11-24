@@ -61,6 +61,22 @@ Check claims against it rather than memory.
   call it. Renaming it with `__` would break that documented use.
 - House style follows sibling repo `../tk-odoo-pubsub` (TerraKernel, LGPL-3, `tk.` models).
 
+## Odoo Apps Store (apps.odoo.com, free, LGPL-3)
+
+Rules from the store's vendor guidelines and FAQ (read 2026-11-24):
+- Manifest `name` ≤ 25 chars, no company name: it is `Tk-FCM` (user's choice).
+  A manifest error unpublishes every module of the repo; bump `version` on
+  each release and on any schema change.
+- `static/description/index.html`: English, no JavaScript, no widgets or
+  modals; style only Bootstrap 4 classes plus `color`, `font-*`, `margin-*`,
+  `padding-*`, `border-*`. External links are invalidated (only own
+  static files, YouTube, Teams, `mailto:`): don't link GitHub there.
+- Data sent to another service must be disclosed in the manifest and the
+  description: keep the "External service and your data" section and the
+  manifest paragraph true when payloads or endpoints change.
+- `icon.png` (real PNG) and `banner.png` (`images` key) are rendered from
+  `store/*.html` by `store/render.sh`; edit the sources, not the PNGs.
+
 ## Scope decisions (settled with the user, don't reopen without asking)
 
 - **FCM is the only provider.** It already relays to APNs and covers web.

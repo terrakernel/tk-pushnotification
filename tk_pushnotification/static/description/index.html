@@ -1,0 +1,193 @@
+<section class="container">
+    <div class="row">
+        <div class="col-md-12 text-center" style="padding-top: 24px; padding-bottom: 8px;">
+            <h1 style="font-weight: 800; color: #26318f;">Tk-FCM</h1>
+            <h3 style="color: #3b4cca; font-weight: 400;">Push notifications from Odoo to your own Android, iOS and web apps</h3>
+            <p class="lead" style="margin-top: 16px;">
+                Firebase Cloud Messaging (HTTP v1) for Odoo 20. Your app registers its FCM token
+                against the signed-in user; your Odoo code, an Automation Rule or another system
+                then notifies users, groups or FCM topics in one call.
+            </p>
+            <p>
+                <span class="badge badge-primary" style="font-size: 14px; padding-top: 6px; padding-bottom: 6px; padding-left: 10px; padding-right: 10px;">Odoo 20.0</span>
+                <span class="badge badge-info" style="font-size: 14px; padding-top: 6px; padding-bottom: 6px; padding-left: 10px; padding-right: 10px;">Community &amp; Enterprise</span>
+                <span class="badge badge-success" style="font-size: 14px; padding-top: 6px; padding-bottom: 6px; padding-left: 10px; padding-right: 10px;">No extra Python packages</span>
+                <span class="badge badge-secondary" style="font-size: 14px; padding-top: 6px; padding-bottom: 6px; padding-left: 10px; padding-right: 10px;">LGPL-3</span>
+            </p>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            <img src="banner.png" alt="Tk-FCM: push notifications from Odoo to your own apps" class="img-fluid d-block mx-auto" style="border-width: 1px; border-style: solid; border-color: #e3e6f0; border-radius: 8px;"/>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="alert alert-info" style="margin-top: 24px;">
+                <strong>For your own apps, not Odoo's.</strong> Odoo's built-in push (Discuss web push,
+                the Odoo mobile app) does not talk to a Firebase project of yours. Tk-FCM is for apps
+                you build, such as a customer app or a field-service app, and leaves Odoo's own push
+                untouched.
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Screenshots: add a section here once taken (provider form, devices list, deliveries list). -->
+
+<section class="container" style="margin-top: 24px;">
+    <h2 style="color: #26318f;">Highlights</h2>
+    <div class="row">
+        <div class="col-md-4" style="margin-bottom: 16px;">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title" style="font-weight: 700;">Never breaks your transaction</h5>
+                    <p class="card-text">Sending only writes outbox rows in the current transaction. A rollback notifies nobody; a commit wakes a cron that delivers within moments.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4" style="margin-bottom: 16px;">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title" style="font-weight: 700;">Retries and token clean-up</h5>
+                    <p class="card-text">Transient FCM errors are retried with exponential backoff, honouring <code>Retry-After</code>. Dead tokens deactivate their device and cancel what was queued for it.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4" style="margin-bottom: 16px;">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title" style="font-weight: 700;">Users, groups and topics</h5>
+                    <p class="card-text">Notify every device of some users, of a group or of contacts with a login, or send once to an FCM topic and reach app users who have no Odoo account.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4" style="margin-bottom: 16px;">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title" style="font-weight: 700;">Shared-phone privacy</h5>
+                    <p class="card-text">When a user signs out, or a token moves to another user, deliveries still queued for that device are cancelled. The next person never sees the previous user's notifications.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4" style="margin-bottom: 16px;">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title" style="font-weight: 700;">Auditable deliveries</h5>
+                    <p class="card-text">One delivery row per device with its state, attempts and FCM error code. Link notifications to the record that caused them, retry failed ones from the list.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4" style="margin-bottom: 16px;">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title" style="font-weight: 700;">Safe on staging</h5>
+                    <p class="card-text">Dry Run has FCM validate every message and deliver none: turn it on in databases restored from production. <em>Test Connection</em> checks credentials without notifying anyone.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="container" style="margin-top: 24px;">
+    <h2 style="color: #26318f;">How it works</h2>
+    <ol style="font-size: 16px;">
+        <li style="margin-bottom: 6px;">Your app signs in to Odoo and registers its FCM token (<code>tk.push.device.register</code>), on every start and whenever the token changes.</li>
+        <li style="margin-bottom: 6px;">Odoo code, an Automation Rule or an API client calls <code>send()</code>. Each notification becomes one delivery per active device, written in the same transaction.</li>
+        <li style="margin-bottom: 6px;">After commit, a cron sends the deliveries to FCM, which passes them on to Android, to Apple (APNs) and to browsers.</li>
+        <li style="margin-bottom: 6px;">Results are recorded per delivery: sent, retried, failed, cancelled or invalid token.</li>
+    </ol>
+</section>
+
+<section class="container" style="margin-top: 24px;">
+    <h2 style="color: #26318f;">Sending</h2>
+    <h5 style="font-weight: 700; margin-top: 16px;">From your module's code</h5>
+    <p>Add <code>tk_pushnotification</code> to your module's <code>depends</code>:</p>
+<pre style="border-width: 1px; border-style: solid; border-color: #e3e6f0; border-radius: 6px; padding-top: 12px; padding-bottom: 12px; padding-left: 12px; padding-right: 12px; font-size: 13px;"><code>def action_confirm(self):
+    res = super().action_confirm()
+    for order in self:
+        order.user_id._tk_push_send(
+            "Order confirmed",
+            f"{order.name} for {order.partner_id.name}",
+            data={'model': 'sale.order', 'id': order.id},  # read by the app
+            record=order,                                  # linked for auditing
+            link_url=f"/my/orders/{order.id}",
+        )
+    return res</code></pre>
+
+    <h5 style="font-weight: 700; margin-top: 16px;">From an Automation Rule, with no module</h5>
+    <p>Action <em>Execute Code</em>:</p>
+<pre style="border-width: 1px; border-style: solid; border-color: #e3e6f0; border-radius: 6px; padding-top: 12px; padding-bottom: 12px; padding-left: 12px; padding-right: 12px; font-size: 13px;"><code>for rec in records:
+    rec.user_id._tk_push_send("Ticket escalated", rec.name, data={'id': rec.id})</code></pre>
+
+    <h5 style="font-weight: 700; margin-top: 16px;">From another system, through JSON-2</h5>
+<pre style="border-width: 1px; border-style: solid; border-color: #e3e6f0; border-radius: 6px; padding-top: 12px; padding-bottom: 12px; padding-left: 12px; padding-right: 12px; font-size: 13px;"><code>curl -X POST https://odoo.example.com/json/2/tk.push.notification/send \
+  -H "Authorization: bearer $ODOO_API_KEY" -H "Content-Type: application/json" \
+  -d '{"users": [7, 12], "title": "Report ready", "body": "Q3 sales", "data": {"report": "q3"}}'</code></pre>
+
+    <p style="margin-top: 12px;">
+        Options include <code>data</code>, <code>image_url</code>, <code>link_url</code>, <code>priority</code>,
+        <code>ttl</code>, <code>collapse_key</code> and per-platform overrides for Android, Apple and web,
+        validated against FCM's limits before anything is queued.
+    </p>
+</section>
+
+<section class="container" style="margin-top: 24px;">
+    <h2 style="color: #26318f;">Setup</h2>
+    <ol style="font-size: 16px;">
+        <li style="margin-bottom: 6px;">Install the module. Settings administrators get the <em>Push Notifications / Administrator</em> group.</li>
+        <li style="margin-bottom: 6px;">In Google Cloud, create a service account in your Firebase project with only the <strong>Firebase Cloud Messaging API Admin</strong> role.</li>
+        <li style="margin-bottom: 6px;">
+            <strong>Settings &rarr; Push Notifications &rarr; Providers</strong>: create a provider and choose how Odoo authenticates:
+            <ul>
+                <li><em>Application Default Credentials</em>: on Google Cloud, the service account attached to the server; elsewhere, a key file named by <code>GOOGLE_APPLICATION_CREDENTIALS</code>. No secret in the database.</li>
+                <li><em>Service Account Key</em>: paste the key JSON, for hosts where you can set neither files nor environment.</li>
+            </ul>
+        </li>
+        <li style="margin-bottom: 6px;">Click <em>Test Connection</em>, then register devices from your app.</li>
+        <li style="margin-bottom: 6px;">Optionally list FCM topics under <em>Push Notifications &rarr; Topics</em>, marking those app users may opt into.</li>
+    </ol>
+</section>
+
+<section class="container" style="margin-top: 24px;">
+    <h2 style="color: #26318f;">External service and your data</h2>
+    <div class="alert alert-warning">
+        <p>
+            <strong>This module sends data to Google.</strong> Notifications are delivered through
+            Firebase Cloud Messaging, a Google service, using a Firebase project and credentials
+            that <em>you</em> provide. For each delivery Odoo sends to
+            <code>fcm.googleapis.com</code>: the device's FCM registration token or the topic name,
+            and the notification's title, body, image URL, link and data. To authenticate, it
+            obtains access tokens from Google (<code>oauth2.googleapis.com</code>, or the Google
+            Cloud metadata server when Odoo runs there). Google processes this data under the
+            terms of your Firebase project.
+        </p>
+        <p style="margin-bottom: 0;">
+            Nothing is sent until you configure a provider. Devices are registered only by your
+            app, for its signed-in user: have the app register once the user has allowed
+            notifications, and unregister it on sign-out. The module collects no usage
+            statistics and sends nothing to TerraKernel or any other party.
+        </p>
+    </div>
+</section>
+
+<section class="container" style="margin-top: 24px;">
+    <h2 style="color: #26318f;">Requirements and limits</h2>
+    <ul style="font-size: 16px;">
+        <li>Odoo 20.0, Community or Enterprise, on premise or Odoo.sh. Not available on Odoo Online, which does not run third-party Python modules.</li>
+        <li>Your own app with the Firebase SDK, or a web app with the Firebase JS SDK, in a Firebase project you control.</li>
+        <li>Firebase Cloud Messaging is the only provider. It also reaches Apple devices (through APNs) and browsers.</li>
+        <li>Delivery is at least once: a crash between FCM accepting a message and Odoo recording it can send it twice. No ordering guarantee.</li>
+        <li>About 10 to 20 messages per second per worker. For broadcasts, use an FCM topic: one request, whatever the audience.</li>
+        <li>Odoo does not see who subscribed to a topic: apps subscribe outside Odoo.</li>
+    </ul>
+</section>
+
+<section class="container" style="margin-top: 24px; margin-bottom: 32px;">
+    <h2 style="color: #26318f;">Support</h2>
+    <p style="font-size: 16px;">
+        Tk-FCM is free and open source (LGPL-3), made by TerraKernel. The full documentation,
+        including delivery semantics, all send options and per-platform payloads, is in the
+        README of the module's source repository.
+    </p>
+</section>
