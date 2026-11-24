@@ -81,13 +81,46 @@ project.
 | Field | Notes |
 |---|---|
 | Code | Stable identifier apps send when registering, e.g. `customer_app`. Needed only when one database serves several apps; apps sending none are attached to the first provider. |
-| Authentication | *Service Account Key*: paste the JSON from Firebase console → Project settings → Service accounts → Generate new private key. The default `firebase-adminsdk-…` account already holds the needed permission (`cloudmessaging.messages.create`). *Application Default Credentials* stores no secret: it reads the service account key file named by `GOOGLE_APPLICATION_CREDENTIALS`, or else asks the GCP metadata server (GCE, GKE workload identity, Cloud Run) — preferred on GCP. User credentials from `gcloud auth application-default login` are not supported. |
+| Authentication | *Application Default Credentials* stores no secret in the database: it reads the service account key file named by `GOOGLE_APPLICATION_CREDENTIALS`, or else asks the GCP metadata server (GCE, GKE workload identity, Cloud Run). User credentials from `gcloud auth application-default login` are not supported. *Service Account Key*: paste the key JSON into the provider. See [Credentials in production](#credentials-in-production) for which to choose and which service account to use. |
 | Dry Run | FCM validates every message but delivers none. Turn this on in staging databases restored from production. Deliveries are then recorded as *Validated (Dry Run)*, never as *Sent*. |
 | Max Attempts / Request Timeout | Retry budget and per-request timeout. |
 
 **Test Connection** authenticates and sends a dry-run message to a token FCM
 is certain to refuse. A token refusal proves the key, project id and
 permissions are right without notifying anyone.
+
+#### Credentials in production
+
+**Use a dedicated service account.** The default `firebase-adminsdk-…`
+account works, but it holds broad Firebase admin rights. Create one for
+Odoo instead: Google Cloud console → IAM & Admin → Service accounts →
+Create, in the Firebase project, granting only **Firebase Cloud Messaging
+API Admin** (`roles/firebasecloudmessaging.admin`). A leaked key then can
+send pushes and nothing else.
+
+Then, in order of preference:
+
+1. **Odoo runs on Google Cloud** (GCE, GKE, Cloud Run): attach that service
+   account to the workload and choose *Application Default Credentials*. No
+   key exists to leak or rotate.
+2. **Elsewhere**: generate a key for it (service account → Keys → Add key →
+   JSON) and put the file on the server, outside the addons path, owned by
+   the Odoo user with mode `0400`, e.g. `/etc/odoo/firebase-fcm.json`. Set
+   `GOOGLE_APPLICATION_CREDENTIALS` to that path in the Odoo process's
+   environment (`Environment=` in the systemd unit; a read-only mounted
+   secret plus `environment:` in Docker) and choose *Application Default
+   Credentials*.
+3. **Hosts where you can set neither files nor environment**: choose
+   *Service Account Key* and paste the JSON. Only push administrators can
+   read the field, but the key is then part of every database backup and of
+   every staging copy restored from one (Dry Run stops those copies sending;
+   they still hold a working key).
+
+Limits of option 2: the environment variable is process-wide, so every
+database and provider served by that Odoo shares one Firebase project (use
+option 3 for per-database keys). Each worker caches its client, and the key
+file is not part of the cache fingerprint: restart Odoo after replacing the
+file.
 
 ### 2. Register devices from your app
 
